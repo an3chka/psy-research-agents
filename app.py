@@ -166,7 +166,7 @@ if result is None:
 
 # ---------------------------------------------------------------- результаты
 for source, err in result.errors.items():
-    st.error(f"Источник {source} недоступен: {err}")
+    st.error(f"**{source}**: {err}")
 if not result.plan.is_psychology:
     st.info("Похоже, запрос не про психологию — приложение всё равно поищет, но оно настроено на эту тему.")
 

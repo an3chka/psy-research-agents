@@ -12,7 +12,9 @@ SYSTEM_PROMPT = """Ты — агент-аналитик в учебной сис
 Тебе передают результаты других агентов: статьи из PubMed, клинические испытания из ClinicalTrials.gov и статистику.
 Напиши сводку на русском языке для студента-психолога. Правила:
 - Используй ТОЛЬКО переданные данные, ничего не придумывай.
-- После каждого утверждения о статье ставь ссылку вида [PMID 12345678], об испытании — [NCT01234567].
+- После каждого утверждения о статье ставь ссылку в квадратных скобках: [PMID и номер статьи из данных],
+  об испытании — [номер испытания из данных, начинается с NCT]. Ссылайся только на номера, которые есть в данных ниже.
+- Если найденные данные не относятся к теме запроса, честно так и напиши.
 - Не давай медицинских советов и не рекомендуй лечение конкретному человеку.
 - Пиши понятно, без лишнего жаргона. Объём — 300–500 слов.
 Структура (markdown, заголовки ###):
@@ -52,6 +54,9 @@ def _context(plan: SearchPlan, pubmed: PubMedResult | None, trials: TrialsResult
 def _link_citations(text: str) -> str:
     text = re.sub(r"\[PMID[:\s]*(\d+)\]", r"[PMID \1](https://pubmed.ncbi.nlm.nih.gov/\1/)", text)
     text = re.sub(r"\[(NCT\d{8})\]", r"[\1](https://clinicaltrials.gov/study/\1)", text)
+    # номера без квадратных скобок, например «(NCT05291533, n=29)», тоже делаем ссылками
+    text = re.sub(r"(?<![\[/])\b(NCT\d{8})\b(?!\])", r"[\1](https://clinicaltrials.gov/study/\1)", text)
+    text = re.sub(r"(?<!\[)\bPMID[:\s]*(\d+)\b(?!\])", r"[PMID \1](https://pubmed.ncbi.nlm.nih.gov/\1/)", text)
     return text
 
 
@@ -95,6 +100,8 @@ def _template_summary(plan: SearchPlan, pubmed: PubMedResult | None, trials: Tri
 
 def summarize(plan: SearchPlan, pubmed: PubMedResult | None, trials: TrialsResult | None,
               stats: StatsResult, n_trials: int = 15) -> Summary:
+    if not (pubmed and pubmed.articles) and not (trials and trials.trials):
+        return Summary("Нет найденных данных, поэтому сводку составить не из чего.", "—", False)
     error = ""
     if llm.is_configured():
         try:

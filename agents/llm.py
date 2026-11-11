@@ -11,12 +11,13 @@ from openai import OpenAI
 
 BASE_URL = "https://openrouter.ai/api/v1"
 
-# "openrouter/free" сам выбирает доступную бесплатную модель;
-# остальные — запасные варианты, если роутер не ответил.
+# Бесплатные модели по порядку: если одна занята (ошибка 429) или молчит, пробуем следующую.
+# "openrouter/free" — последний запасной вариант: роутер сам выбирает модель, иногда слабую.
 DEFAULT_MODELS = [
-    "openrouter/free",
-    "google/gemma-4-31b-it:free",
     "nvidia/nemotron-3-ultra-550b-a55b:free",
+    "nvidia/nemotron-3.5-super-vl:free",
+    "google/gemma-4-31b-it:free",
+    "openrouter/free",
 ]
 
 
@@ -52,6 +53,9 @@ def chat(system: str, user: str, temperature: float = 0.3, max_tokens: int = 250
                 temperature=temperature,
                 max_tokens=max_tokens,
                 extra_headers={"X-Title": "Psy Research Agents"},
+                # отключаем "размышления": иначе думающие модели тратят весь лимит токенов
+                # на скрытые рассуждения и возвращают пустой ответ
+                extra_body={"reasoning": {"enabled": False}},
             )
             text = (resp.choices[0].message.content or "").strip()
             # некоторые "думающие" модели оставляют рассуждения в <think>...</think>
