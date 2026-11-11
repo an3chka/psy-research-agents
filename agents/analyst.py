@@ -52,6 +52,9 @@ def _context(plan: SearchPlan, pubmed: PubMedResult | None, trials: TrialsResult
 
 
 def _link_citations(text: str) -> str:
+    # списки в скобках «[PMID 1, PMID 2]» или «[NCT…, NCT…]»: убираем скобки, номера станут ссылками ниже
+    text = re.sub(r"\[((?:\s*(?:PMID[:\s]*\d+|NCT\d{8})\s*[,;]){1,}\s*(?:PMID[:\s]*\d+|NCT\d{8})\s*)\]",
+                  r"\1", text)
     text = re.sub(r"\[PMID[:\s]*(\d+)\]", r"[PMID \1](https://pubmed.ncbi.nlm.nih.gov/\1/)", text)
     text = re.sub(r"\[(NCT\d{8})\]", r"[\1](https://clinicaltrials.gov/study/\1)", text)
     # номера без квадратных скобок, например «(NCT05291533, n=29)», тоже делаем ссылками
