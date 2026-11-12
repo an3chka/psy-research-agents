@@ -97,3 +97,18 @@ def search(
     total_txt = f"{total:,}".replace(",", " ")
     log(f"найдено {total_txt} испытаний, для анализа загружено {len(trials)}")
     return TrialsResult(total_count=total, trials=trials)
+
+
+def count_intervention(condition: str, intervention: str, year_from: int | None = None) -> tuple[int, int]:
+    """Сколько испытаний по методу: (всего, идут сейчас). Нужны только счётчики, сами записи не грузим."""
+    params = {"format": "json", "countTotal": "true", "pageSize": 1, "fields": "NCTId", "query.intr": intervention}
+    if condition:
+        params["query.cond"] = condition
+    if year_from:
+        params["filter.advanced"] = f"AREA[StartDate]RANGE[{year_from}-01-01,MAX]"
+    counts = []
+    for extra in ({}, {"filter.overallStatus": ",".join(ACTIVE_STATUSES)}):
+        resp = _session.get(API, params={**params, **extra}, timeout=30)
+        resp.raise_for_status()
+        counts.append(int(resp.json().get("totalCount", 0)))
+    return counts[0], counts[1]

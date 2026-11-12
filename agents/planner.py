@@ -93,17 +93,7 @@ def plan(user_query: str, use_llm: bool = True) -> SearchPlan:
     if use_llm and llm.is_configured():
         try:
             text, model = llm.chat(SYSTEM_PROMPT, query, temperature=0.0, max_tokens=600)
-            data = llm.extract_json(text)
-            return SearchPlan(
-                topic_ru=str(data.get("topic_ru") or query),
-                pubmed_query=str(data.get("pubmed_query") or data.get("keywords_en") or query),
-                keywords_en=str(data.get("keywords_en") or query),
-                trials_condition=str(data.get("trials_condition") or ""),
-                trials_term=str(data.get("trials_term") or ""),
-                is_psychology=bool(data.get("is_psychology", True)),
-                source="llm",
-                note=f"модель: {model}",
-            )
+            return _from_llm(llm.extract_json(text), query, f"модель: {model}")
         except Exception as exc:  # noqa: BLE001
             note = f"нейросеть не сработала ({type(exc).__name__}), ищу по исходному тексту"
     elif not use_llm:
@@ -121,3 +111,32 @@ def plan(user_query: str, use_llm: bool = True) -> SearchPlan:
         source="raw",
         note=note,
     )
+
+
+def _from_llm(data: dict, query: str, note: str) -> SearchPlan:
+    return SearchPlan(
+        topic_ru=str(data.get("topic_ru") or query),
+        pubmed_query=str(data.get("pubmed_query") or data.get("keywords_en") or query),
+        keywords_en=str(data.get("keywords_en") or query),
+        trials_condition=str(data.get("trials_condition") or ""),
+        trials_term=str(data.get("trials_term") or ""),
+        is_psychology=bool(data.get("is_psychology", True)),
+        source="llm",
+        note=note,
+    )
+
+
+def replan(user_query: str, previous: SearchPlan, problem: str, advice: str) -> SearchPlan | None:
+    """Переписывает запросы по замечанию агента-критика. None — если нейросеть не ответила."""
+    user = (f"Вопрос пользователя: {user_query}\n\n"
+            f"Прошлые запросы:\nPubMed: {previous.pubmed_query}\n"
+            f"ClinicalTrials: condition={previous.trials_condition!r}, term={previous.trials_term!r}\n\n"
+            f"Агент-критик проверил результаты и пишет: {problem}\nСовет: {advice}\n\n"
+            "Составь исправленные запросы с учётом замечания. Формат ответа тот же.")
+    try:
+        text, model = llm.chat(SYSTEM_PROMPT, user, temperature=0.0, max_tokens=600)
+        plan_ = _from_llm(llm.extract_json(text), previous.topic_ru, f"исправлено по замечанию критика, модель: {model}")
+        plan_.topic_ru = previous.topic_ru
+        return plan_
+    except Exception:  # noqa: BLE001
+        return None

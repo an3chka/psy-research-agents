@@ -1,5 +1,21 @@
 [theme]
-primaryColor = "#2a78d6"
+base = "light"
+primaryColor = "#2f8f62"
+backgroundColor = "#f6f9f6"
+secondaryBackgroundColor = "#e9f2ec"
+textColor = "#1c2a22"
+linkColor = "#23784f"
+borderColor = "#d6e4da"
+showWidgetBorder = true
+baseRadius = "0.75rem"
+font = "Inter:https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+
+[theme.sidebar]
+backgroundColor = "#eef5f0"
+secondaryBackgroundColor = "#ffffff"
+
+[client]
+toolbarMode = "minimal"
 
 [browser]
 gatherUsageStats = false

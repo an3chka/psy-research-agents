@@ -3,6 +3,7 @@ import re
 from dataclasses import dataclass, field
 
 from . import llm
+from .methods import MethodsResult
 from .planner import SearchPlan
 from .pubmed_agent import PubMedResult
 from .stats_agent import STATUS_RU, StatsResult
@@ -15,6 +16,8 @@ SYSTEM_PROMPT = """Ты — агент-аналитик в учебной сис
 - После каждого утверждения о статье ставь ссылку в квадратных скобках: [PMID и номер статьи из данных],
   об испытании — [номер испытания из данных, начинается с NCT]. Ссылайся только на номера, которые есть в данных ниже.
 - Если найденные данные не относятся к теме запроса, честно так и напиши.
+- В разделе «Что изучается сейчас» используй блок «МЕТОДЫ ИЗ СТАТЕЙ»: сравни, о каких методах пишут в статьях
+  и по каким сейчас идут испытания. Не пиши в тексте служебные названия блоков данных.
 - Не давай медицинских советов и не рекомендуй лечение конкретному человеку.
 - Пиши понятно, без лишнего жаргона. Объём — 300–500 слов.
 Структура (markdown, заголовки ###):
@@ -35,8 +38,19 @@ class Summary:
     error: str = ""
 
 
+def _methods_lines(found: MethodsResult | None) -> list[str]:
+    lines = []
+    for m in (found.methods if found else []):
+        refs = ", ".join(f"PMID {p}" for p in m.pmids[:3])
+        total = "?" if m.trials_total is None else m.trials_total
+        active = "?" if m.trials_active is None else m.trials_active
+        lines.append(f"- {m.name_ru} ({m.kind}): статей в выборке {len(m.pmids)} [{refs}]; "
+                     f"испытаний всего {total}, идут сейчас {active}")
+    return lines
+
+
 def _context(plan: SearchPlan, pubmed: PubMedResult | None, trials: TrialsResult | None,
-             stats: StatsResult, n_trials: int) -> str:
+             stats: StatsResult, n_trials: int, found: MethodsResult | None = None) -> str:
     parts = [f"Тема: {plan.topic_ru}", f"Статистика: {stats.facts}", "", "СТАТЬИ PUBMED:"]
     for a in (pubmed.articles if pubmed else []):
         types = ", ".join(t for t in a.pub_types if t != "Journal Article")
@@ -48,6 +62,9 @@ def _context(plan: SearchPlan, pubmed: PubMedResult | None, trials: TrialsResult
             f"вмешательства: {'; '.join(t.interventions[:4]) or '—'} ({', '.join(t.intervention_types)}) | "
             f"страны: {', '.join(t.countries[:4]) or '—'} | участников: {t.enrollment or '—'}"
         )
+    if found and found.methods:
+        parts += ["", "МЕТОДЫ ИЗ СТАТЕЙ (агент PubMed нашёл их в статьях, агент ClinicalTrials посчитал испытания):"]
+        parts += _methods_lines(found)
     return "\n".join(parts)
 
 
@@ -75,7 +92,7 @@ def _fmt(n: int) -> str:
 
 
 def _template_summary(plan: SearchPlan, pubmed: PubMedResult | None, trials: TrialsResult | None,
-                      stats: StatsResult) -> str:
+                      stats: StatsResult, found: MethodsResult | None = None) -> str:
     f = stats.facts
     lines = [f"### Коротко\nТема: **{plan.topic_ru}**."]
     if pubmed:
@@ -92,6 +109,9 @@ def _template_summary(plan: SearchPlan, pubmed: PubMedResult | None, trials: Tri
     lines.append("\n### Испытания")
     for t in (trials.trials[:5] if trials else []):
         lines.append(f"- {t.title} — {STATUS_RU.get(t.status, t.status)} [{t.nct_id}]")
+    if found and found.methods:
+        lines.append("\n### Методы из статей и их испытания")
+        lines += _methods_lines(found)
     if "behavioral_share" in f:
         b, d = f["behavioral_share"], f["drug_share"]
         lines.append(f"\n### Психотерапия или лекарства\nПоведенческие вмешательства: **{b['pct']}%** "
@@ -102,17 +122,18 @@ def _template_summary(plan: SearchPlan, pubmed: PubMedResult | None, trials: Tri
 
 
 def summarize(plan: SearchPlan, pubmed: PubMedResult | None, trials: TrialsResult | None,
-              stats: StatsResult, n_trials: int = 15, use_llm: bool = True) -> Summary:
+              stats: StatsResult, n_trials: int = 15, use_llm: bool = True,
+              found: MethodsResult | None = None) -> Summary:
     if not (pubmed and pubmed.articles) and not (trials and trials.trials):
         return Summary("Нет найденных данных, поэтому сводку составить не из чего.", "—", False)
     error = ""
     if use_llm and llm.is_configured():
         try:
-            text, model = llm.chat(SYSTEM_PROMPT, _context(plan, pubmed, trials, stats, n_trials))
+            text, model = llm.chat(SYSTEM_PROMPT, _context(plan, pubmed, trials, stats, n_trials, found))
             cited, unknown = _check_citations(text, pubmed, trials)
             return Summary(_link_citations(text), model, True, cited, unknown)
         except Exception as exc:  # noqa: BLE001
             error = str(exc)
-    text = _template_summary(plan, pubmed, trials, stats)
+    text = _template_summary(plan, pubmed, trials, stats, found)
     cited, unknown = _check_citations(text, pubmed, trials)
     return Summary(_link_citations(text), "шаблон", False, cited, unknown, error)

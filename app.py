@@ -7,7 +7,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-st.set_page_config(page_title="PsyResearch — мультиагентный поиск", page_icon="🧠", layout="wide")
+st.set_page_config(page_title="PsyResearch", page_icon=":material/psychology:", layout="wide")
 
 # Ключи из Streamlit Secrets → в переменные окружения (агенты читают их оттуда)
 for _key in ("OPENROUTER_API_KEY", "OPENROUTER_MODEL", "NCBI_API_KEY"):
@@ -21,8 +21,10 @@ from agents import llm, orchestrator  # noqa: E402
 from agents.planner import PRESETS  # noqa: E402
 from agents.stats_agent import PHASE_RU, STATUS_RU  # noqa: E402
 
-ACCENT = "#2a78d6"
-MUTED = "#9aa0a6"
+ACCENT = "#2f8f62"  # нежно-зелёный, проверен на контраст и цветовую слепоту
+INK = "#1c2a22"
+MUTED = "#66756b"
+LINE = "#d6e4da"
 THIS_YEAR = date.today().year
 
 
@@ -38,7 +40,8 @@ def _layout(fig: go.Figure, height: int, x_title: str = "", y_title: str = "") -
         bargap=0.25,
     )
     fig.update_xaxes(title=x_title, showgrid=False, zeroline=False)
-    fig.update_yaxes(title=y_title, gridcolor="rgba(128,128,128,0.18)", zeroline=False)
+    fig.update_yaxes(title=y_title, gridcolor="rgba(28,42,34,0.08)", zeroline=False)
+    fig.update_layout(font=dict(family="Inter, sans-serif", color=INK, size=13))
     return fig
 
 
@@ -57,7 +60,7 @@ def ranked_bars(df: pd.DataFrame, label_col: str, value_col: str = "Количе
     _layout(fig, height=max(180, 34 * len(d) + 40))
     fig.update_xaxes(visible=False)
     fig.update_yaxes(showgrid=False)
-    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+    st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
 
 
 def years_line(years: pd.DataFrame):
@@ -77,13 +80,13 @@ def years_line(years: pd.DataFrame):
         ))
         fig.add_trace(go.Scatter(
             x=partial["Год"], y=partial["Публикаций"], mode="markers",
-            marker=dict(size=8, color="white", line=dict(color=ACCENT, width=2)),
+            marker=dict(size=9, color="white", line=dict(color=ACCENT, width=2)),
             hovertemplate="%{x}: %{y:,} публикаций (год ещё не закончился)<extra></extra>",
         ))
     _layout(fig, height=320, y_title="Публикаций за год")
     fig.update_xaxes(dtick=1)
     fig.update_layout(separators=", ")
-    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+    st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
 
 
 def start_years_bars(df: pd.DataFrame):
@@ -95,7 +98,7 @@ def start_years_bars(df: pd.DataFrame):
         hovertemplate="%{x}: %{y} испытаний<extra></extra>",
     ))
     _layout(fig, height=260, y_title="Испытаний")
-    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+    st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
 
 
 def _secret(name: str) -> str:
@@ -109,15 +112,39 @@ def fmt(n: int) -> str:
     return f"{n:,}".replace(",", " ")
 
 
+# ---------------------------------------------------------------- стили
+st.markdown("""
+<style>
+[data-testid="stDecoration"] {display: none;}
+header[data-testid="stHeader"] {background: transparent;}
+.block-container {max-width: 1180px; padding-top: 2.4rem; padding-bottom: 4rem;}
+h1, h2, h3, h4 {letter-spacing: -0.015em;}
+.hero-kicker {font-size: .78rem; font-weight: 600; letter-spacing: .09em; text-transform: uppercase;
+              color: #2f8f62; margin-bottom: .35rem;}
+.hero-title {font-size: 2.7rem; font-weight: 700; line-height: 1.08; margin: 0 0 .55rem 0; color: #1c2a22;}
+.hero-sub {font-size: 1.05rem; line-height: 1.55; color: #5d6c62; max-width: 760px; margin-bottom: 1.6rem;}
+[data-testid="stForm"] {background: #ffffff; border: 1px solid #d6e4da; border-radius: 18px; padding: 1.1rem 1.25rem .4rem;}
+[data-testid="stMetric"] {background: #ffffff; border: 1px solid #d6e4da; border-radius: 16px; padding: 16px 18px;}
+[data-testid="stMetricLabel"] p {color: #5d6c62;}
+[data-testid="stExpander"] details {background: #ffffff; border-color: #d6e4da; border-radius: 14px;}
+.stTabs [data-baseweb="tab-list"] {gap: .4rem;}
+.steps {display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-top: 1.4rem;}
+.step {background: #ffffff; border: 1px solid #d6e4da; border-radius: 16px; padding: 18px 20px;}
+.step b {display: block; font-size: 1rem; margin-bottom: .3rem; color: #1c2a22;}
+.step span {color: #5d6c62; font-size: .93rem; line-height: 1.5;}
+.step i {font-style: normal; color: #2f8f62; font-weight: 700; font-size: .85rem; display: block; margin-bottom: .4rem;}
+</style>
+""", unsafe_allow_html=True)
+
 # ---------------------------------------------------------------- боковая панель
 with st.sidebar:
-    st.header("⚙️ Настройки поиска")
+    st.subheader("Настройки поиска")
     year_from, year_to = st.slider("Период", 2000, THIS_YEAR, (2015, THIS_YEAR))
     max_articles = st.slider("Сколько статей показать", 5, 30, 12)
     trials_sample = st.slider("Сколько испытаний анализировать", 50, 500, 200, step=50)
-    only_active = st.checkbox("Только активные испытания (идёт набор / продолжаются)")
-    with_trend = st.checkbox("Считать динамику публикаций по годам", value=True,
-                             help="Отдельный запрос в PubMed на каждый год — добавляет несколько секунд")
+    only_active = st.toggle("Только активные испытания", help="Идёт набор участников или испытание продолжается")
+    with_trend = st.toggle("Динамика публикаций по годам", value=True,
+                           help="Отдельный запрос в PubMed на каждый год — добавляет несколько секунд")
     st.divider()
     # Пароль защищает только нейросеть (чтобы чужие запросы не тратили дневной лимит ключа).
     # Без пароля поиск и статистика работают как обычно, а сводка собирается по шаблону.
@@ -125,7 +152,7 @@ with st.sidebar:
     llm_allowed = llm.is_configured()
     if llm_allowed and app_password:
         if not st.session_state.get("llm_unlocked"):
-            entered = st.text_input("🔑 Пароль для нейросети", type="password",
+            entered = st.text_input("Пароль для нейросети", type="password",
                                     help="Без пароля поиск и статистика тоже работают, "
                                          "но сводка собирается по шаблону.")
             if entered:
@@ -135,40 +162,42 @@ with st.sidebar:
                 st.error("Неверный пароль")
         llm_allowed = st.session_state.get("llm_unlocked", False)
     if llm_allowed:
-        st.success("🧠 Нейросеть подключена (OpenRouter)")
+        st.success("Нейросеть подключена", icon=":material/check_circle:")
     elif llm.is_configured():
-        st.info("🧠 Нейросеть выключена: введите пароль. Без него сводка будет собрана по шаблону, "
-                "а свой запрос лучше писать на английском.")
+        st.info("Нейросеть выключена: введите пароль. Без него сводка собирается по шаблону, "
+                "а свой запрос лучше писать на английском.", icon=":material/lock:")
     else:
-        st.warning("🧠 Нейросеть не подключена — сводка будет собрана по шаблону. "
-                   "Свободный ввод лучше писать на английском.")
+        st.warning("Нейросеть не подключена — сводка будет собрана по шаблону. "
+                   "Свой запрос лучше писать на английском.", icon=":material/info:")
     st.caption("Источники: [PubMed](https://pubmed.ncbi.nlm.nih.gov/) · "
                "[ClinicalTrials.gov](https://clinicaltrials.gov/)")
 
 # ---------------------------------------------------------------- шапка и ввод
-st.title("🧠 PsyResearch")
 st.markdown(
-    "Мультиагентный поиск научной информации по **психологии и психиатрии**. "
-    "Агенты одновременно ищут опубликованные исследования в **PubMed** и клинические испытания "
-    "в **ClinicalTrials.gov**, считают статистику и собирают общую сводку."
+    '<div class="hero-kicker">Мультиагентный поиск · психология и психиатрия</div>'
+    '<div class="hero-title">PsyResearch</div>'
+    '<div class="hero-sub">Шесть агентов ищут исследования в PubMed и клинические испытания '
+    'в ClinicalTrials.gov, проверяют друг друга и собирают сводку со ссылками на источники.</div>',
+    unsafe_allow_html=True,
 )
 
-st.write("**Быстрый выбор темы:**")
-preset_names = list(PRESETS)
-cols = st.columns(4)
-for i, name in enumerate(preset_names):
-    if cols[i % 4].button(name, use_container_width=True):
-        st.session_state["query"] = name
+with st.form("search", border=False):
+    c_in, c_btn = st.columns([4, 1], vertical_alignment="bottom")
+    c_in.text_input("Ваш вопрос", key="query",
+                    placeholder="например: эффективность mindfulness при тревоге у студентов")
+    if c_btn.form_submit_button("Найти", type="primary", icon=":material/search:", width="stretch"):
         st.session_state["run"] = True
 
-with st.form("search"):
-    query = st.text_input(
-        "Или свой запрос",
-        key="query",
-        placeholder="например: эффективность mindfulness при тревоге у студентов",
-    )
-    if st.form_submit_button("🔎 Найти", type="primary"):
+
+def _pick_topic():
+    name = st.session_state.get("topic_pill")
+    if name:
+        st.session_state["query"] = name
         st.session_state["run"] = True
+        st.session_state["topic_pill"] = None
+
+
+st.pills("Или готовая тема", list(PRESETS), key="topic_pill", on_change=_pick_topic)
 
 # ---------------------------------------------------------------- запуск агентов
 if st.session_state.pop("run", False) and st.session_state.get("query", "").strip():
@@ -180,14 +209,26 @@ if st.session_state.pop("run", False) and st.session_state.get("query", "").stri
     with st.status("Агенты работают…", expanded=True) as status:
         result = orchestrator.run(
             st.session_state["query"].strip(), settings,
-            on_step=lambda s: st.write(f"`{s.seconds:>4}с` **{s.agent}**: {s.message}"),
+            on_step=lambda s: st.markdown(f"<span style='color:{MUTED}'>{s.seconds:>4} с</span> · "
+                                          f"**{s.agent}** — {s.message}", unsafe_allow_html=True),
         )
-        status.update(label="Готово ✅", state="complete", expanded=False)
+        status.update(label=f"Готово за {result.trace[-1].seconds:.0f} с", state="complete", expanded=False)
     st.session_state["result"] = result
 
 result: orchestrator.RunResult | None = st.session_state.get("result")
 if result is None:
-    st.info("Выберите тему или введите свой запрос — агенты найдут статьи и испытания.")
+    st.markdown(
+        '<div class="steps">'
+        '<div class="step"><i>01</i><b>Планировщик</b><span>переводит вопрос в запросы на языке каждой базы</span></div>'
+        '<div class="step"><i>02</i><b>Поиск и критик</b><span>два агента ищут параллельно, критик проверяет '
+        'результаты и при необходимости возвращает запрос на доработку</span></div>'
+        '<div class="step"><i>03</i><b>Методы → испытания</b><span>методы лечения из статей передаются агенту '
+        'испытаний: что уже изучено и что проверяют сейчас</span></div>'
+        '<div class="step"><i>04</i><b>Статистика и сводка</b><span>тренды, доли с доверительными интервалами '
+        'и текст со ссылками, каждая из которых проверена</span></div>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
     st.stop()
 
 # ---------------------------------------------------------------- результаты
@@ -197,19 +238,18 @@ if not result.plan.is_psychology:
     st.info("Похоже, запрос не про психологию — приложение всё равно поищет, но оно настроено на эту тему.")
 
 f = result.stats.facts
-st.subheader(f"Тема: {result.plan.topic_ru}")
+st.markdown(f"### {result.plan.topic_ru}")
 m1, m2, m3, m4 = st.columns(4)
-m1.metric("Статей в PubMed", fmt(f.get("pubmed_total", 0)),
-          help=f"За {year_from}–{year_to}")
-m2.metric("Испытаний в ClinicalTrials", fmt(f.get("trials_total", 0)))
+m1.metric("Статей в PubMed", fmt(f.get("pubmed_total", 0)), help=f"За {year_from}–{year_to}")
+m2.metric("Испытаний", fmt(f.get("trials_total", 0)), help="ClinicalTrials.gov")
 m3.metric("Активных испытаний", f"{f.get('trials_active_share', 0)}%", help="Доля в проанализированной выборке")
 if "behavioral_share" in f:
     b = f["behavioral_share"]
-    m4.metric("С психотерапией / тренингами", f"{b['pct']}%",
+    m4.metric("С психотерапией", f"{b['pct']}%",
               help=f"Доля испытаний с поведенческим вмешательством, 95% ДИ {b['ci_low']}–{b['ci_high']}%, n={b['n']}")
 
-tab_sum, tab_art, tab_tr, tab_stat, tab_agents = st.tabs(
-    ["🧠 Сводка", "📚 Статьи", "🧪 Испытания", "📊 Статистика", "🤖 Как работают агенты"]
+tab_sum, tab_meth, tab_art, tab_tr, tab_stat, tab_agents = st.tabs(
+    ["Сводка", "Методы", "Статьи", "Испытания", "Статистика", "Как работают агенты"]
 )
 
 with tab_sum:
@@ -218,14 +258,38 @@ with tab_sum:
     st.divider()
     cap = f"Сводку написал агент-аналитик ({s.model}). Ссылок на источники: {len(s.cited)}."
     if s.unknown_ids:
-        st.warning("⚠️ Аналитик сослался на источники, которых нет в найденных данных (возможная ошибка нейросети): "
-                   + ", ".join(s.unknown_ids))
+        st.warning("Аналитик сослался на источники, которых нет в найденных данных (возможная ошибка нейросети): "
+                   + ", ".join(s.unknown_ids), icon=":material/warning:")
     elif s.cited:
-        cap += " Все ссылки проверены — каждая есть среди найденных статей и испытаний ✅"
+        cap += " Все ссылки проверены — каждая есть среди найденных статей и испытаний."
     st.caption(cap)
     if s.error:
         with st.expander("Почему не сработала нейросеть"):
             st.code(s.error)
+
+with tab_meth:
+    mres = result.methods
+    if not mres or not mres.methods:
+        st.info("В найденных статьях не удалось выделить методы лечения.")
+    else:
+        st.markdown("#### Что пишут в статьях → что проверяют сейчас")
+        st.caption(f"Агент PubMed выделил методы в найденных статьях ({mres.source}) и передал их агенту "
+                   f"ClinicalTrials. Тот посчитал испытания по каждому методу, начатые с {year_from} года.")
+        df_m = pd.DataFrame([{
+            "Метод": m.name_ru, "Тип": m.kind, "Статей в выборке": len(m.pmids),
+            "Испытаний всего": m.trials_total, "Идут сейчас": m.trials_active,
+            "Статьи (PMID)": ", ".join(m.pmids[:6]),
+        } for m in mres.methods])
+        top = int(df_m["Испытаний всего"].fillna(0).max() or 1)
+        st.dataframe(
+            df_m, width="stretch", hide_index=True,
+            column_config={
+                "Испытаний всего": st.column_config.ProgressColumn(min_value=0, max_value=top, format="%d"),
+                "Идут сейчас": st.column_config.NumberColumn(format="%d"),
+            },
+        )
+        st.caption("Если метод часто встречается в статьях, но испытаний по нему мало, это может быть "
+                   "пробелом в исследованиях — или признаком того, что метод уже хорошо изучен.")
 
 with tab_art:
     articles = result.pubmed.articles if result.pubmed else []
@@ -243,8 +307,8 @@ with tab_art:
             "PMID": a.pmid, "Год": a.year, "Название": a.title, "Журнал": a.journal,
             "Авторы": a.authors, "Тип": "; ".join(a.pub_types), "Ссылка": a.url,
         } for a in articles])
-        st.download_button("⬇️ Скачать статьи (CSV)", df_art.to_csv(index=False).encode("utf-8-sig"),
-                           "pubmed_articles.csv", "text/csv")
+        st.download_button("Скачать статьи (CSV)", df_art.to_csv(index=False).encode("utf-8-sig"),
+                           "pubmed_articles.csv", "text/csv", icon=":material/download:")
 
 with tab_tr:
     trials = result.trials.trials if result.trials else []
@@ -260,20 +324,20 @@ with tab_tr:
         statuses = st.multiselect("Фильтр по статусу", sorted(df_tr["Статус"].unique()), placeholder="Все статусы")
         view = df_tr[df_tr["Статус"].isin(statuses)] if statuses else df_tr
         st.dataframe(
-            view, use_container_width=True, hide_index=True, height=480,
+            view, width="stretch", hide_index=True, height=480,
             column_config={
                 "NCT": st.column_config.LinkColumn("NCT", display_text=r"study/(NCT\d+)"),
                 "Участников": st.column_config.NumberColumn(format="%d"),
                 "Старт": st.column_config.NumberColumn(format="%d"),
             },
         )
-        st.download_button("⬇️ Скачать испытания (CSV)", view.to_csv(index=False).encode("utf-8-sig"),
-                           "clinical_trials.csv", "text/csv")
+        st.download_button("Скачать испытания (CSV)", view.to_csv(index=False).encode("utf-8-sig"),
+                           "clinical_trials.csv", "text/csv", icon=":material/download:")
 
 with tab_stat:
     st_res = result.stats
     if not st_res.years.empty:
-        st.markdown("#### Сколько публикаций выходит по теме каждый год (PubMed)")
+        st.markdown("#### Сколько публикаций выходит по теме каждый год")
         years_line(st_res.years)
         notes = []
         if f.get("pubmed_cagr_pct") is not None:
@@ -324,32 +388,52 @@ with tab_agents:
     st.markdown("#### Схема системы")
     st.graphviz_chart("""
     digraph {
-      rankdir=LR; bgcolor="transparent";
-      node [shape=box, style="rounded,filled", fillcolor="#e8f0fb", color="#2a78d6", fontname="Helvetica"];
-      edge [color="#7a7a7a"];
-      user [label="👤 Запрос\\nпользователя", fillcolor="#f2f2f2", color="#9aa0a6"];
-      planner [label="🧭 Планировщик\\n(LLM: перевод и\\nпоисковые запросы)"];
-      pubmed [label="📚 Агент PubMed\\n(E-utilities API)"];
-      trials [label="🧪 Агент ClinicalTrials\\n(API v2)"];
-      stats [label="📊 Статистик\\n(тренды, доли, ДИ)"];
-      analyst [label="🧠 Аналитик\\n(LLM: сводка\\nсо ссылками)"];
-      ui [label="🖥 Streamlit", fillcolor="#f2f2f2", color="#9aa0a6"];
+      rankdir=LR; bgcolor="transparent"; nodesep=0.45; ranksep=0.55;
+      node [shape=box, style="rounded,filled", fillcolor="#e9f2ec", color="#2f8f62", penwidth=1.2,
+            fontname="Helvetica", fontcolor="#1c2a22", fontsize=12, margin="0.18,0.1"];
+      edge [color="#9aaa9f", fontname="Helvetica", fontsize=10, fontcolor="#5d6c62", arrowsize=0.7];
+      user [label="Вопрос", fillcolor="#ffffff", color="#c9d8cd"];
+      planner [label="Планировщик\\n(нейросеть)"];
+      pubmed [label="Агент PubMed"];
+      trials [label="Агент\\nClinicalTrials"];
+      critic [label="Критик\\n(нейросеть)"];
+      stats [label="Статистик"];
+      analyst [label="Аналитик\\n(нейросеть)"];
+      ui [label="Сводка", fillcolor="#ffffff", color="#c9d8cd"];
       user -> planner; planner -> pubmed; planner -> trials;
-      pubmed -> stats; trials -> stats; pubmed -> analyst; trials -> analyst; stats -> analyst;
-      analyst -> ui;
+      pubmed -> trials [label="методы\\nиз статей", color="#2f8f62", fontcolor="#23784f", constraint=false];
+      pubmed -> critic; trials -> critic;
+      critic -> planner [label="замечание →\\nповторный поиск", style=dashed, color="#2f8f62",
+                         fontcolor="#23784f", constraint=false];
+      critic -> stats; critic -> analyst; stats -> analyst; analyst -> ui;
     }
     """)
     st.markdown(
         "- **Планировщик** переводит вопрос на русском в запросы на языке каждого источника.\n"
-        "- **Агенты PubMed и ClinicalTrials** работают **параллельно**, каждый со своим API.\n"
+        "- **Агенты PubMed и ClinicalTrials** ищут **параллельно**, каждый через своё API.\n"
+        "- **Критик** оценивает, отвечают ли результаты на вопрос. Если нет — объясняет планировщику, "
+        "что не так, и поиск повторяется (до двух раз). Остаётся лучшая попытка.\n"
+        "- **Агент PubMed передаёт агенту ClinicalTrials** методы лечения из статей, "
+        "и тот проверяет, сколько испытаний идёт по каждому.\n"
         "- **Статистик** считает динамику публикаций, распределения и доверительные интервалы.\n"
         "- **Аналитик** пишет сводку только по найденным данным; приложение проверяет, "
         "что каждая ссылка в сводке реально есть среди результатов."
     )
+    if result.rounds:
+        st.markdown("#### Проверки критика")
+        st.dataframe(pd.DataFrame([{
+            "Попытка": r.attempt,
+            "Запрос PubMed": r.plan.pubmed_query,
+            "Статей": r.pubmed_total, "Испытаний": r.trials_total,
+            "Оценка": "—" if r.review.score is None else f"{r.review.score}/10",
+            "Замечание критика": r.review.problem or r.review.model,
+        } for r in result.rounds]), width="stretch", hide_index=True)
+        if len(result.rounds) > 1:
+            st.caption(f"Для результатов выбрана попытка {result.chosen_round} — с лучшей оценкой критика.")
     st.markdown("#### Журнал последнего запуска")
     st.dataframe(
         pd.DataFrame([{"Время, с": s.seconds, "Агент": s.agent, "Действие": s.message} for s in result.trace]),
-        use_container_width=True, hide_index=True,
+        width="stretch", hide_index=True,
     )
 
 st.divider()
