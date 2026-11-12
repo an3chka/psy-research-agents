@@ -80,6 +80,13 @@ def _by_dictionary(articles: list[Article]) -> list[Method]:
     return sorted(found, key=lambda m: -len(m.pmids))[:MAX_METHODS]
 
 
+def _clean_query(query: str) -> str:
+    """«SSRI/SNRI (antidepressants)» → «SSRI OR SNRI»: узкие запросы с косыми и скобками почти ничего не находят."""
+    query = re.sub(r"\(.*?\)", " ", query)
+    parts = [q.strip() for q in re.split(r"[/;,]| or ", query, flags=re.I) if q.strip()]
+    return " OR ".join(dict.fromkeys(parts))
+
+
 def _by_llm(articles: list[Article]) -> tuple[list[Method], str]:
     known = {a.pmid for a in articles}
     context = "\n".join(f"[PMID {a.pmid}] {a.title}\n{a.abstract[:600]}" for a in articles)
@@ -88,7 +95,7 @@ def _by_llm(articles: list[Article]) -> tuple[list[Method], str]:
     for m in llm.extract_json(text).get("methods", [])[:MAX_METHODS]:
         pmids = [str(p).replace("PMID", "").strip() for p in m.get("pmids", [])]
         pmids = [p for p in dict.fromkeys(pmids) if p in known]  # только реально найденные статьи
-        name, query = str(m.get("name_ru") or "").strip(), str(m.get("query_en") or "").strip()
+        name, query = str(m.get("name_ru") or "").strip(), _clean_query(str(m.get("query_en") or ""))
         if name and query and pmids:
             methods.append(Method(name, query, str(m.get("kind") or "другое"), pmids))
     return sorted(methods, key=lambda m: -len(m.pmids)), model

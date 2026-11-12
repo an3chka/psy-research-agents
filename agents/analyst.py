@@ -16,8 +16,8 @@ SYSTEM_PROMPT = """Ты — агент-аналитик в учебной сис
 - После каждого утверждения о статье ставь ссылку в квадратных скобках: [PMID и номер статьи из данных],
   об испытании — [номер испытания из данных, начинается с NCT]. Ссылайся только на номера, которые есть в данных ниже.
 - Если найденные данные не относятся к теме запроса, честно так и напиши.
-- В разделе «Что изучается сейчас» используй блок «МЕТОДЫ ИЗ СТАТЕЙ»: сравни, о каких методах пишут в статьях
-  и по каким сейчас идут испытания. Не пиши в тексте служебные названия блоков данных.
+- В разделе «Что изучается сейчас» используй данные о методах лечения из статей: сравни, о каких методах пишут
+  в статьях и по каким сейчас идут испытания. Не пиши в тексте служебные названия блоков данных.
 - Не давай медицинских советов и не рекомендуй лечение конкретному человеку.
 - Пиши понятно, без лишнего жаргона. Объём — 300–500 слов.
 Структура (markdown, заголовки ###):
@@ -63,7 +63,7 @@ def _context(plan: SearchPlan, pubmed: PubMedResult | None, trials: TrialsResult
             f"страны: {', '.join(t.countries[:4]) or '—'} | участников: {t.enrollment or '—'}"
         )
     if found and found.methods:
-        parts += ["", "МЕТОДЫ ИЗ СТАТЕЙ (агент PubMed нашёл их в статьях, агент ClinicalTrials посчитал испытания):"]
+        parts += ["", "Методы лечения из статей и число испытаний по ним (агент PubMed нашёл методы, агент ClinicalTrials посчитал испытания):"]
         parts += _methods_lines(found)
     return "\n".join(parts)
 
@@ -78,6 +78,12 @@ def _link_citations(text: str) -> str:
     text = re.sub(r"(?<![\[/])\b(NCT\d{8})\b(?!\])", r"[\1](https://clinicaltrials.gov/study/\1)", text)
     text = re.sub(r"(?<!\[)\bPMID[:\s]*(\d+)\b(?!\])", r"[PMID \1](https://pubmed.ncbi.nlm.nih.gov/\1/)", text)
     return text
+
+
+def _clean_labels(text: str) -> str:
+    """Убираем служебные подписи, если модель всё-таки переписала их из данных."""
+    text = re.sub(r"\*{0,2}(МЕТОДЫ ИЗ СТАТЕЙ|СТАТЬИ PUBMED|КЛИНИЧЕСКИЕ ИСПЫТАНИЯ)\*{0,2}:\s*", "", text)
+    return re.sub(r"\s*\[статистика\]", "", text)
 
 
 def _check_citations(text: str, pubmed: PubMedResult | None, trials: TrialsResult | None) -> tuple[list, list]:
@@ -131,7 +137,7 @@ def summarize(plan: SearchPlan, pubmed: PubMedResult | None, trials: TrialsResul
         try:
             text, model = llm.chat(SYSTEM_PROMPT, _context(plan, pubmed, trials, stats, n_trials, found))
             cited, unknown = _check_citations(text, pubmed, trials)
-            return Summary(_link_citations(text), model, True, cited, unknown)
+            return Summary(_link_citations(_clean_labels(text)), model, True, cited, unknown)
         except Exception as exc:  # noqa: BLE001
             error = str(exc)
     text = _template_summary(plan, pubmed, trials, stats, found)
