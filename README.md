@@ -1,5 +1,7 @@
 # PsyResearch: мультиагентный поиск по психологии и психиатрии
 
+**Приложение:** https://psy-research-agents-mh3u67macxlxvvwmhupudp.streamlit.app/
+
 Учебный проект. Веб-приложение на Streamlit, в котором несколько агентов собирают информацию из двух источников:
 
 - **PubMed** (NCBI E-utilities API): опубликованные научные статьи;

@@ -126,6 +126,7 @@ h1, h2, h3, h4 {letter-spacing: -0.015em;}
 [data-testid="stForm"] {background: #ffffff; border: 1px solid #d6e4da; border-radius: 18px; padding: 1.1rem 1.25rem .4rem;}
 [data-testid="stMetric"] {background: #ffffff; border: 1px solid #d6e4da; border-radius: 16px; padding: 16px 18px;}
 [data-testid="stMetricLabel"] p {color: #5d6c62;}
+[data-testid="stMetricValue"] {font-size: clamp(1.5rem, 2.6vw, 2.25rem);}
 [data-testid="stExpander"] details {background: #ffffff; border-color: #d6e4da; border-radius: 14px;}
 .stTabs [data-baseweb="tab-list"] {gap: .4rem;}
 .steps {display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-top: 1.4rem;}
@@ -182,7 +183,7 @@ st.markdown(
 )
 
 with st.form("search", border=False):
-    c_in, c_btn = st.columns([4, 1], vertical_alignment="bottom")
+    c_in, c_btn = st.columns([3, 1], vertical_alignment="bottom")
     c_in.text_input("Ваш вопрос", key="query",
                     placeholder="например: эффективность mindfulness при тревоге у студентов")
     if c_btn.form_submit_button("Найти", type="primary", icon=":material/search:", width="stretch"):
