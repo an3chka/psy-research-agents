@@ -97,16 +97,16 @@ def _template_summary(plan: SearchPlan, pubmed: PubMedResult | None, trials: Tri
         lines.append(f"\n### Психотерапия или лекарства\nПоведенческие вмешательства: **{b['pct']}%** "
                      f"(95% ДИ {b['ci_low']}–{b['ci_high']}%), лекарства: **{d['pct']}%** "
                      f"(95% ДИ {d['ci_low']}–{d['ci_high']}%), n = {b['n']}.")
-    lines.append("\n*Сводка собрана по шаблону: нейросеть не подключена или недоступна.*")
+    lines.append("\n*Сводка собрана по шаблону: нейросеть не подключена, недоступна или не введён пароль.*")
     return "\n".join(lines)
 
 
 def summarize(plan: SearchPlan, pubmed: PubMedResult | None, trials: TrialsResult | None,
-              stats: StatsResult, n_trials: int = 15) -> Summary:
+              stats: StatsResult, n_trials: int = 15, use_llm: bool = True) -> Summary:
     if not (pubmed and pubmed.articles) and not (trials and trials.trials):
         return Summary("Нет найденных данных, поэтому сводку составить не из чего.", "—", False)
     error = ""
-    if llm.is_configured():
+    if use_llm and llm.is_configured():
         try:
             text, model = llm.chat(SYSTEM_PROMPT, _context(plan, pubmed, trials, stats, n_trials))
             cited, unknown = _check_citations(text, pubmed, trials)

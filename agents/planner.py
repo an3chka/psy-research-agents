@@ -84,13 +84,13 @@ class SearchPlan:
     note: str = ""
 
 
-def plan(user_query: str) -> SearchPlan:
+def plan(user_query: str, use_llm: bool = True) -> SearchPlan:
     query = user_query.strip()
 
     if query in PRESETS:
         return SearchPlan(source="preset", **{"topic_ru": query, **PRESETS[query]})
 
-    if llm.is_configured():
+    if use_llm and llm.is_configured():
         try:
             text, model = llm.chat(SYSTEM_PROMPT, query, temperature=0.0, max_tokens=600)
             data = llm.extract_json(text)
@@ -106,6 +106,8 @@ def plan(user_query: str) -> SearchPlan:
             )
         except Exception as exc:  # noqa: BLE001
             note = f"нейросеть не сработала ({type(exc).__name__}), ищу по исходному тексту"
+    elif not use_llm:
+        note = "нейросеть выключена (не введён пароль), ищу по исходному тексту"
     else:
         note = "нейросеть не подключена, ищу по исходному тексту"
 

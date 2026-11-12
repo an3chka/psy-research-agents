@@ -1,4 +1,5 @@
 """PsyResearch: мультиагентный сбор информации из PubMed и ClinicalTrials.gov по психологии и психиатрии."""
+import hmac
 import os
 from datetime import date
 
@@ -97,6 +98,13 @@ def start_years_bars(df: pd.DataFrame):
     st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
 
+def _secret(name: str) -> str:
+    try:
+        return str(st.secrets.get(name, "") or os.environ.get(name, ""))
+    except Exception:  # noqa: BLE001 — secrets.toml может отсутствовать
+        return os.environ.get(name, "")
+
+
 def fmt(n: int) -> str:
     return f"{n:,}".replace(",", " ")
 
@@ -111,8 +119,26 @@ with st.sidebar:
     with_trend = st.checkbox("Считать динамику публикаций по годам", value=True,
                              help="Отдельный запрос в PubMed на каждый год — добавляет несколько секунд")
     st.divider()
-    if llm.is_configured():
+    # Пароль защищает только нейросеть (чтобы чужие запросы не тратили дневной лимит ключа).
+    # Без пароля поиск и статистика работают как обычно, а сводка собирается по шаблону.
+    app_password = _secret("APP_PASSWORD")
+    llm_allowed = llm.is_configured()
+    if llm_allowed and app_password:
+        if not st.session_state.get("llm_unlocked"):
+            entered = st.text_input("🔑 Пароль для нейросети", type="password",
+                                    help="Без пароля поиск и статистика тоже работают, "
+                                         "но сводка собирается по шаблону.")
+            if entered:
+                if hmac.compare_digest(entered.encode(), app_password.encode()):
+                    st.session_state["llm_unlocked"] = True
+                    st.rerun()
+                st.error("Неверный пароль")
+        llm_allowed = st.session_state.get("llm_unlocked", False)
+    if llm_allowed:
         st.success("🧠 Нейросеть подключена (OpenRouter)")
+    elif llm.is_configured():
+        st.info("🧠 Нейросеть выключена: введите пароль. Без него сводка будет собрана по шаблону, "
+                "а свой запрос лучше писать на английском.")
     else:
         st.warning("🧠 Нейросеть не подключена — сводка будет собрана по шаблону. "
                    "Свободный ввод лучше писать на английском.")
@@ -149,7 +175,7 @@ if st.session_state.pop("run", False) and st.session_state.get("query", "").stri
     settings = orchestrator.Settings(
         max_articles=max_articles, trials_sample=trials_sample,
         year_from=year_from, year_to=year_to,
-        only_active_trials=only_active, with_trend=with_trend,
+        only_active_trials=only_active, with_trend=with_trend, use_llm=llm_allowed,
     )
     with st.status("Агенты работают…", expanded=True) as status:
         result = orchestrator.run(

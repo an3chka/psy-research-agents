@@ -16,6 +16,7 @@ class Settings:
     year_to: int = 2026
     only_active_trials: bool = False
     with_trend: bool = True
+    use_llm: bool = True  # False, если на сайте не введён пароль
 
 
 @dataclass
@@ -51,7 +52,7 @@ def run(query: str, settings: Settings, on_step=lambda step: None) -> RunResult:
     # 1. Планировщик
     plan_log = log("🧭 Планировщик")
     plan_log(f"получил запрос: «{query}»")
-    plan = planner.plan(query)
+    plan = planner.plan(query, settings.use_llm)
     plan_log(f"PubMed: {plan.pubmed_query}")
     plan_log(f"ClinicalTrials: condition=«{plan.trials_condition or '—'}», term=«{plan.trials_term or '—'}»"
              + (f" ({plan.note})" if plan.note else ""))
@@ -61,7 +62,7 @@ def run(query: str, settings: Settings, on_step=lambda step: None) -> RunResult:
     pubmed = trials = None
     if plan.source == "raw" and re.search(r"[а-яё]", query, flags=re.I):
         # без нейросети русский текст не переведётся, а PubMed по кириллице вернёт мусор
-        errors["Планировщик"] = ("не удалось перевести запрос на английский (нейросеть недоступна). "
+        errors["Планировщик"] = ("не удалось перевести запрос на английский (нейросеть недоступна или не введён пароль). "
                                  "Выберите готовую тему или напишите запрос по-английски.")
         plan_log("поиск остановлен: запрос на русском, а перевести его нечем")
     else:
@@ -96,7 +97,7 @@ def run(query: str, settings: Settings, on_step=lambda step: None) -> RunResult:
     # 4. Аналитик
     an_log = log("🧠 Аналитик")
     an_log("пишу сводку…")
-    summary = analyst.summarize(plan, pubmed, trials, stats, settings.trials_for_summary)
+    summary = analyst.summarize(plan, pubmed, trials, stats, settings.trials_for_summary, settings.use_llm)
     an_log(f"готово ({summary.model}); ссылок в тексте: {len(summary.cited)}, "
            f"не найдено в данных: {len(summary.unknown_ids)}")
 
